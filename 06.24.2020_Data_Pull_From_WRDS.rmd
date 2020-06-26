@@ -1,0 +1,220 @@
+---
+title: "06.24.2020_Work"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(RPostgres)
+wrds <- dbConnect(Postgres(),
+                  host='wrds-pgdata.wharton.upenn.edu',
+                  port=9737,
+                  dbname='wrds',
+                  sslmode='require',
+                  user='echoi98')
+library(tidyverse)
+library(dbplyr)
+library(caret)
+library(fastDummies)
+```
+Link Tool
+```{r}
+link_tool<-read.csv("crsp_ibes_link_tool.csv",header = TRUE)
+link_tool<- link_tool%>%filter(SCORE!=6)
+# relevant 
+link_tool<-subset(link_tool,select=-c(NCUSIP,SCORE,sdate,edate))
+link_tool<-unique(link_tool)
+link_tool
+```
+# Get Crsp Values
+```{r}
+# hexcd 1 = NYSE, hexcd 2 = AMEX, hexcd 3 = NASDAQ 
+res <- dbSendQuery(wrds, "select date,permno,cusip,prc, ret, bid, shrout ,hexcd, cfacpr,hsiccd from crspa.msf
+                   where date between '1970-12-01'
+                   and '2018-12-31'")
+crsp_data <- dbFetch(res, n=-1)
+dbClearResult(res)
+crsp_data %>% group_by(permno)
+```
+# Begin to process crsp_data
+```{r}
+crsp_data_v1<-crsp_data
+# Omit values with N.A
+crsp_data_v1<-na.omit(crsp_data_v1)
+crsp_data_v1$year <- as.numeric(format(crsp_data_v1$date,"%Y"))
+crsp_data_v1$month <- as.numeric(format(crsp_data_v1$date,"%m"))
+# Find the true price by adjusting the value 
+crsp_data_v1$prc <- abs(crsp_data_v1$prc)/crsp_data_v1$cfacpr
+# Calculate market cap using absolute value of bid multiples by shares outstanding, factor of 1000
+crsp_data_v1$market_capitalization <- crsp_data_v1$bid* crsp_data_v1$shrout
+# Keep only values where price or bid is over 1 dollar 
+crsp_data_v1 <-crsp_data_v1 %>% filter(prc>1||bid>1)
+# Rename the columns we want 
+col_order <- c("date","year", "month", "permno","price","monthly_returns","shares_outstanding","market_capitalization",'industry_code','two_digit_sich')
+crsp_data_v1<- rename(crsp_data_v1, price= prc, monthly_returns=ret, shares_outstanding = shrout, exchange = hexcd, industry_code=hsiccd)
+crsp_data_v1$two_digit_sich[crsp_data_v1$industry_code<1000]<-floor(crsp_data_v1$industry_code/10)
+crsp_data_v1$two_digit_sich[crsp_data_v1$industry_code>=1000]<-floor(crsp_data_v1$industry_code/100)
+crsp_data_v1<-crsp_data_v1[,col_order]
+crsp_data_v1
+```
+# Remove if the return is the following values
+```{r}
+crsp_data_v2<-crsp_data_v1 %>% filter(monthly_returns!=-66.0|monthly_returns!=-77.0|monthly_returns!=-88.0|monthly_returns!=-99.0)
+crsp_data_v2
+```
+
+IBES Pull
+```{r}
+res <- dbSendQuery(wrds, "select fpi,anndats,fpedats, cusip, ticker, analys, value from ibes.det_epsus
+                   where fpedats between '1980-01-01' and '2019-12-31'")
+ibes_pull_us<- dbFetch(res, n=-1)
+dbClearResult(res)
+ibes_pull_us %>% group_by()
+res <- dbSendQuery(wrds, "select fpi,anndats,fpedats, cusip, ticker, analys, value from ibes.det_epsint
+                   where fpedats between '1980-01-01' and '2019-12-31'")
+ibes_pull_int<- dbFetch(res, n=-1)
+dbClearResult(res)
+ibes_pull_int %>% group_by()
+IBES<-rbind(ibes_pull_us,ibes_pull_int)
+IBES %>% group_by()
+```
+# Begin to Filter IBES Data
+```{r}
+IBES_v1<-IBES
+IBES_v1$forecast_period_end_month<-as.numeric(format(IBES_v1$fpedats,"%m"))
+IBES_v1$forecast_period_end_year<-as.numeric(format(IBES_v1$fpedats,"%Y"))
+IBES_v1$analyst_year<-as.numeric(format(IBES_v1$anndats,"%Y"))
+# Make sure all forecast end values are for year ending december
+IBES_v1<-IBES_v1 %>% filter(forecast_period_end_month==12)
+# Ensure that each forecast is for each year 
+IBES_v1<-IBES_v1 %>% filter(forecast_period_end_year==analyst_year)
+# filter to only get firms that can be matched 
+IBES_v1<-subset(IBES_v1,select=-c(cusip))
+IBES_v2<-inner_join(IBES_v1,link_tool,by =c('ticker'='TICKER'))
+IBES_v2<-unique(IBES_v2)
+IBES_v2 %>% group_by()
+```
+# Rename value
+```{r}
+IBES_v2<-rename(IBES_v2,f_eps=value)
+```
+
+# Save this file
+```{r}
+write.csv(IBES_v2 , "IBES_DATABASE.csv")
+```
+# Get the actual eps results 
+```{r}
+# Get the IBES Actual Values from US
+res <- dbSendQuery(wrds, "select cusip, pends,ticker,value from ibes.act_epsus
+                   where pends between '1980-01-01' and '2018-12-31'
+                   and pdicity = 'ANN'
+                   and cusip !=''")
+ibes_actuals_us<- dbFetch(res, n=-1)
+dbClearResult(res)
+# Get the IBES Actual Values from INT
+res <- dbSendQuery(wrds, "select cusip,pends,ticker, value from ibes.act_epsint
+                   where pends between '1980-01-01' and '2018-12-31'
+                   and pdicity = 'ANN'
+                   and cusip !=''")
+ibes_actuals_int<- dbFetch(res, n=-1)
+dbClearResult(res)
+ibes_actuals<-rbind(ibes_actuals_us,ibes_actuals_int)
+ibes_actuals
+```
+Begin to filter ibes actuals
+```{r}
+ibes_actuals_v1<-ibes_actuals
+# Dont need the cusip column
+ibes_actuals_v1<-subset(ibes_actuals_v1,select=-c(cusip))
+ibes_actuals_v1$period_end_month<-as.numeric(format(ibes_actuals_v1$pends,"%m"))
+ibes_actuals_v1<-ibes_actuals_v1 %>% filter(period_end_month==12)
+complete_ibes<-inner_join(IBES_v2,ibes_actuals_v1, by=c('ticker'='ticker','fpedats'='pends'))
+complete_ibes<-rename(complete_ibes,actual_eps=value)
+complete_ibes
+```
+# Columns we can drop 
+```{r}
+complete_ibes_v1<-complete_ibes
+complete_ibes_v1<-subset(complete_ibes_v1,select=-c(forecast_period_end_month,forecast_period_end_year,analyst_year,period_end_month,fpi))
+complete_ibes_v1
+```
+# Read in the Beta sheet
+```{r}
+beta<-read.csv("crsp_data_with_beta_portfolio_returns_export.csv",header = TRUE)
+beta %>% group_by()
+crsp_data_v2%>% group_by()
+```
+# Drop unnecessary columns
+```{r}
+beta_v1<-subset(beta,select=-c(X,benchmark_returns,date))
+crsp_data_v3<-subset(crsp_data_v2,select=-c(shares_outstanding))
+crsp_data_with_beta<-inner_join(crsp_data_v3,beta_v1,by=c('year'='year','month'='month','permno'='permno'))
+crsp_data_with_beta
+```
+# Look at joining IBES and CRSP together
+```{r}
+complete_ibes_v1
+crsp_data_with_beta
+```
+# Join by permno
+```{r}
+complete_ibes_v2<-subset(complete_ibes_v1,select=-c(fpedats))
+complete_ibes_v2$month_analyst_predict<-as.numeric(format(complete_ibes_v2$anndats,"%m"))
+complete_ibes_v2$year_analyst_predict<-as.numeric(format(complete_ibes_v2$anndats,"%Y"))
+complete_data_base<-inner_join(complete_ibes_v2,crsp_data_with_beta,by=c('year_analyst_predict'='year','month_analyst_predict'='month','PERMNO'='permno'))
+complete_data_base
+```
+# Take out columns we now dont need
+```{r}
+complete_data_base_v1<-subset(complete_data_base,select=-c(anndats,date))
+complete_data_base_v1
+write.csv(complete_data_base_v1,"pre_filter_complete_data_base_v1.csv")
+```
+# Begin data manipulation and filtering
+```{r}
+# make sure each month has a min of 3 analyst estimates
+complete_data_base_v2<-complete_data_base_v1
+complete_data_base_v2<-complete_data_base_v2 %>% group_by(ticker,month_analyst_predict,year_analyst_predict) %>% mutate(num_est=n_distinct(analys))
+complete_data_base_v2<-complete_data_base_v2 %>% filter(num_est>=3)
+# calculate the forecast standard deviation
+complete_data_base_v2<-complete_data_base_v2 %>% group_by(ticker,month_analyst_predict,year_analyst_predict) %>% mutate(forecast_standard_deviation=sd(f_eps))
+# calculate scaled feps by price 
+complete_data_base_v2$scaled_feps<-complete_data_base_v2$forecast_standard_deviation/complete_data_base_v2$price
+# calculate average forecast for each month
+complete_data_base_v2<-complete_data_base_v2 %>% group_by(ticker,month_analyst_predict,year_analyst_predict) %>% mutate(average_forecasted_earnings=mean(f_eps))
+complete_data_base_v2
+```
+# Now it does not matter which analyst estimate we take since we have the monthly averages/sd/forecast
+```{r}
+complete_data_base_v3<-subset(complete_data_base_v2,select=-c(analys,f_eps,PERMNO))
+complete_data_base_v3<-unique(complete_data_base_v3)
+complete_data_base_v3
+```
+# Ensure for each year we have january to december data
+```{r}
+complete_data_base_v4<-complete_data_base_v3
+complete_data_base_v4<-complete_data_base_v4 %>% group_by(ticker,year_analyst_predict) %>% mutate(number_of_months_per_year=n_distinct(month_analyst_predict))
+complete_data_base_v4<-complete_data_base_v4 %>% filter(number_of_months_per_year==12)
+complete_data_base_v4
+```
+# Save this data down and drop columns we dont need
+```{r}
+complete_data_base_v5<-subset(complete_data_base_v4,select=-c(number_of_months_per_year))
+complete_data_base_v5<-complete_data_base_v5%>% group_by(ticker) %>% mutate(number_of_years=n_distinct(year_analyst_predict))
+write.csv(complete_data_base_v5,"data_filtered_complete.csv")
+complete_data_base_v6<-complete_data_base_v5 %>% filter(number_of_years>=9)
+complete_data_base_v6
+write.csv(complete_data_base_v6,"data_filtered_complete_at_least_9_years_of_data.csv")
+```
+# Some stats 
+```{r}
+length(unique(complete_data_base_v4$ticker))
+```
+
+
+
+

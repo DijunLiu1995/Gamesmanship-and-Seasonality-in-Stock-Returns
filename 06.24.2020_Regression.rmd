@@ -1,0 +1,288 @@
+---
+title: "06.24.2020_Regression"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+# Read in the files
+```{r}
+regression_data<-read.csv("database_for_regression.csv",header = TRUE)
+regression_data<-subset(regression_data,select=-c(X))
+regression_data
+```
+# Prepare data for regression
+```{r}
+regression_data_v1<-subset(regression_data,select=c(month_analyst_predict,year_analyst_predict,monthly_returns,excess_returns,quartile_feps))
+regression_data_v1$month_analyst_predict<-as.factor(regression_data_v1$month_analyst_predict)
+regression_data_v1<-rename(regression_data_v1,month_of_analyst_forecast=month_analyst_predict)
+regression_data_v1<-dummy_cols(regression_data_v1)
+# rename dummy bar
+regression_data_v1<-rename(regression_data_v1,February=month_of_analyst_forecast_2,March=month_of_analyst_forecast_3,April=month_of_analyst_forecast_4,May=month_of_analyst_forecast_5,June=month_of_analyst_forecast_6,July=month_of_analyst_forecast_7,August=month_of_analyst_forecast_8,September=month_of_analyst_forecast_9,October=month_of_analyst_forecast_10,November=month_of_analyst_forecast_11,December=month_of_analyst_forecast_12)
+regression_data_v1
+first_partition<-regression_data_v1 %>% filter(year_analyst_predict<=1996)
+second_partition<-regression_data_v1 %>% filter(year_analyst_predict>1996)
+```
+# Run Regression on full database
+```{r}
+# Run raw Regression on full database
+raw_returns_full_database_regression_model <- lm(monthly_returns ~ February + March + April + May + June + July + August + September + October + November  +December, data = regression_data_v1)
+chi_squared_raw_returns_full_database<-chisq.test(regression_data_v1$monthly_returns,regression_data_v1$month_of_analyst_forecast)
+
+# Run raw Regression on 1980-1996
+raw_returns_full_database_1980_1996_regression_model<- lm(monthly_returns ~ February + March + April + May + June + July + August + September + October + November  +December, data = first_partition)
+chi_squared_raw_returns_1980_1996<-chisq.test(first_partition$monthly_returns,first_partition$month_of_analyst_forecast)
+
+# Run raw Regression on 1997 - 2018
+raw_returns_full_database_1997_2018_regression_model<- lm(monthly_returns ~ February + March + April + May + June + July + August + September + October + November  +December, data = second_partition)
+chi_squared_raw_returns_1997_2018<-chisq.test(second_partition$monthly_returns,second_partition$month_of_analyst_forecast)
+
+# Run Regression on excess returns
+excess_returns_full_database_regression_model <- lm(excess_returns ~ February + March + April + May + June + July + August + September + October + November  +December, data = regression_data_v1)
+chi_squared_excess_returns_full_database<-chisq.test(regression_data_v1$excess_returns,regression_data_v1$month_of_analyst_forecast)
+
+# Run excess Regression on 1980-1996
+excess_returns_full_database_1980_1996_regression_model<- lm(excess_returns ~ February + March + April + May + June + July + August + September + October + November  +December, data = first_partition)
+chi_squared_excess_returns_1980_1996<-chisq.test(first_partition$excess_returns,first_partition$month_of_analyst_forecast)
+
+# Run excess Regression on 1997-2018
+excess_returns_full_database_1997_2018_regression_model<- lm(excess_returns ~ February + March + April + May + June + July + August + September + October + November  +December, data = second_partition)
+chi_squared_excess_returns_1997_2018<-chisq.test(second_partition$excess_returns,second_partition$month_of_analyst_forecast)
+```
+# Run Regression on second period Quartiles
+```{r}
+# Run on Quartiled data for 1997_2018
+quartile_one <-second_partition%>% filter(quartile_feps ==1)
+quartile_two<-second_partition %>% filter (quartile_feps==2)
+quartile_three<-second_partition %>% filter (quartile_feps==3)
+quartile_four<-second_partition %>% filter (quartile_feps==4)
+# Raw Quartiles for scaled feps 1980_1996 
+raw_returns_1997_2018_quartile_one_scaled_feps<- lm(monthly_returns ~ February + March + April + May + June + July + August + September + October + November  +December, data = quartile_one)
+raw_returns_1997_2018_quartile_two_scaled_feps<- lm(monthly_returns ~ February + March + April + May + June + July + August + September + October + November  +December, data = quartile_two)
+raw_returns_1997_2018_quartile_three_scaled_feps<- lm(monthly_returns ~ February + March + April + May + June + July + August + September + October + November  +December, data = quartile_three)
+raw_returns_1997_2018_quartile_four_scaled_feps<- lm(monthly_returns ~ February + March + April + May + June + July + August + September + October + November  +December, data = quartile_four)
+# Run Chi Squared Test for Raw Returns by Scaled FEPS 1997_2018
+chi_squared_raw_returns_1997_2018_quartile_one_scaled_feps<-chisq.test(quartile_one$monthly_returns,quartile_one$month_of_analyst_forecast)
+chi_squared_raw_returns_1997_2018_quartile_two_scaled_feps<-chisq.test(quartile_two$monthly_returns,quartile_two$month_of_analyst_forecast)
+chi_squared_raw_returns_1997_2018_quartile_three_scaled_feps<-chisq.test(quartile_three$monthly_returns,quartile_three$month_of_analyst_forecast)
+chi_squared_raw_returns_1997_2018_quartile_four_scaled_feps<-chisq.test(quartile_four$monthly_returns,quartile_four$month_of_analyst_forecast)
+# Excess Quartiles for scaled feps 1997_2018
+excess_returns_1997_2018_quartile_one_scaled_feps<- lm(excess_returns ~ February + March + April + May + June + July + August + September + October + November  +December, data = quartile_one)
+excess_returns_1997_2018_quartile_two_scaled_feps<- lm(excess_returns ~ February + March + April + May + June + July + August + September + October + November  +December, data = quartile_two)
+excess_returns_1997_2018_quartile_three_scaled_feps<- lm(excess_returns ~ February + March + April + May + June + July + August + September + October + November  +December, data = quartile_three)
+excess_returns_1997_2018_quartile_four_scaled_feps<- lm(excess_returns ~ February + March + April + May + June + July + August + September + October + November  +December, data = quartile_four)
+# Run Chi Squared Test for excess Returns by Scaled FEPS 1997_2018
+chi_squared_excess_returns_1997_2018_quartile_one_scaled_feps<-chisq.test(quartile_one$excess_returns,quartile_one$month_of_analyst_forecast)
+chi_squared_excess_returns_1997_2018_quartile_two_scaled_feps<-chisq.test(quartile_two$excess_returns,quartile_two$month_of_analyst_forecast)
+chi_squared_excess_returns_1997_2018_quartile_three_scaled_feps<-chisq.test(quartile_three$excess_returns,quartile_three$month_of_analyst_forecast)
+chi_squared_excess_returns_1997_2018_quartile_four_scaled_feps<-chisq.test(quartile_four$excess_returns,quartile_four$month_of_analyst_forecast)
+```
+# Output into excel files
+```{r}
+x <- c("Overall","Q1(Low)","Q2","Q3","Q4(High)")
+y <- c('January','February','March','April','May','June','July','August','September','October','November','December')
+z <- c('January','February','March','April','May','June','July','August','September','October','November','December','F_Statistic','F_Statistic-P','Chi-Squared_Test','Chi-Square-P')
+# Creation of the coefficent table 
+raw_return_regression_coeff_table_1997_2018<- data.frame(matrix(ncol = 5, nrow = 12))
+colnames(raw_return_regression_coeff_table_1997_2018) <- x
+rownames(raw_return_regression_coeff_table_1997_2018)<-y
+# Creation of the t_stat_table 
+raw_return_regression_t_stat_table_1997_2018<- data.frame(matrix(ncol = 5, nrow = 12))
+colnames(raw_return_regression_t_stat_table_1997_2018) <- x
+rownames(raw_return_regression_t_stat_table_1997_2018)<-y
+# Creation of the p_stat_table 
+raw_return_regression_p_stat_table_1997_2018<- data.frame(matrix(ncol = 5, nrow = 16))
+colnames(raw_return_regression_p_stat_table_1997_2018) <- x
+rownames(raw_return_regression_p_stat_table_1997_2018)<-z
+# Overall
+temp_coeff<-coef(raw_returns_full_database_1997_2018_regression_model)
+temp_t_stat<-summary(raw_returns_full_database_1997_2018_regression_model)[["coefficients"]][, "t value"]
+temp_p_stat<-summary(raw_returns_full_database_1997_2018_regression_model)[["coefficients"]][, 4]
+for(index in 1:length(temp_coeff)){
+  raw_return_regression_coeff_table_1997_2018[index,1]<-temp_coeff[index]
+  raw_return_regression_t_stat_table_1997_2018[index,1]<-temp_t_stat[index]
+  raw_return_regression_p_stat_table_1997_2018[index,1]<-temp_p_stat[index]
+}
+p_value <- (1-pf(summary(raw_returns_full_database_1997_2018_regression_model)$fstatistic[1],
+                 summary(raw_returns_full_database_1997_2018_regression_model)$fstatistic[2],
+                 summary(raw_returns_full_database_1997_2018_regression_model)$fstatistic[3]))
+# Add the overall Stats
+raw_return_regression_p_stat_table_1997_2018[13,1]<-summary(raw_returns_full_database_1997_2018_regression_model)$fstatistic[1]
+raw_return_regression_p_stat_table_1997_2018[14,1]<-p_value
+raw_return_regression_p_stat_table_1997_2018[15,1]<-chi_squared_raw_returns_1997_2018[1]
+raw_return_regression_p_stat_table_1997_2018[16,1]<-chi_squared_raw_returns_1997_2018[3]
+# Quartile One
+temp_coeff<-coef(raw_returns_1997_2018_quartile_one_scaled_feps)
+temp_t_stat<-summary(raw_returns_1997_2018_quartile_one_scaled_feps)[["coefficients"]][, "t value"]
+temp_p_stat<-summary(raw_returns_1997_2018_quartile_one_scaled_feps)[["coefficients"]][, 4]
+for(index in 1:length(temp_coeff)){
+  raw_return_regression_coeff_table_1997_2018[index,2]<-temp_coeff[index]
+  raw_return_regression_t_stat_table_1997_2018[index,2]<-temp_t_stat[index]
+  raw_return_regression_p_stat_table_1997_2018[index,2]<-temp_p_stat[index]
+}
+p_value <- (1-pf(summary(raw_returns_1997_2018_quartile_one_scaled_feps)$fstatistic[1],
+                 summary(raw_returns_1997_2018_quartile_one_scaled_feps)$fstatistic[2],
+                 summary(raw_returns_1997_2018_quartile_one_scaled_feps)$fstatistic[3]))
+raw_return_regression_p_stat_table_1997_2018[13,2]<-summary(raw_returns_1997_2018_quartile_one_scaled_feps)$fstatistic[1]
+raw_return_regression_p_stat_table_1997_2018[14,2]<-p_value
+raw_return_regression_p_stat_table_1997_2018[15,2]<-chi_squared_raw_returns_1997_2018_quartile_one_scaled_feps[1]
+raw_return_regression_p_stat_table_1997_2018[16,2]<-chi_squared_raw_returns_1997_2018_quartile_one_scaled_feps[3]
+# Quartile two
+temp_coeff<-coef(raw_returns_1997_2018_quartile_two_scaled_feps)
+temp_t_stat<-summary(raw_returns_1997_2018_quartile_two_scaled_feps)[["coefficients"]][, "t value"]
+temp_p_stat<-summary(raw_returns_1997_2018_quartile_two_scaled_feps)[["coefficients"]][, 4]
+for(index in 1:length(temp_coeff)){
+  raw_return_regression_coeff_table_1997_2018[index,3]<-temp_coeff[index]
+  raw_return_regression_t_stat_table_1997_2018[index,3]<-temp_t_stat[index]
+  raw_return_regression_p_stat_table_1997_2018[index,3]<-temp_p_stat[index]
+}
+p_value <- (1-pf(summary(raw_returns_1997_2018_quartile_two_scaled_feps)$fstatistic[1],
+                 summary(raw_returns_1997_2018_quartile_two_scaled_feps)$fstatistic[2],
+                 summary(raw_returns_1997_2018_quartile_two_scaled_feps)$fstatistic[3]))
+raw_return_regression_p_stat_table_1997_2018[13,3]<-summary(raw_returns_1997_2018_quartile_two_scaled_feps)$fstatistic[1]
+raw_return_regression_p_stat_table_1997_2018[14,3]<-p_value
+raw_return_regression_p_stat_table_1997_2018[15,3]<-chi_squared_raw_returns_1997_2018_quartile_two_scaled_feps[1]
+raw_return_regression_p_stat_table_1997_2018[16,3]<-chi_squared_raw_returns_1997_2018_quartile_two_scaled_feps[3]
+# Quartile Three
+temp_coeff<-coef(raw_returns_1997_2018_quartile_three_scaled_feps)
+temp_t_stat<-summary(raw_returns_1997_2018_quartile_three_scaled_feps)[["coefficients"]][, "t value"]
+temp_p_stat<-summary(raw_returns_1997_2018_quartile_three_scaled_feps)[["coefficients"]][, 4]
+for(index in 1:length(temp_coeff)){
+  raw_return_regression_coeff_table_1997_2018[index,4]<-temp_coeff[index]
+  raw_return_regression_t_stat_table_1997_2018[index,4]<-temp_t_stat[index]
+  raw_return_regression_p_stat_table_1997_2018[index,4]<-temp_p_stat[index]
+}
+p_value <- (1-pf(summary(raw_returns_1997_2018_quartile_three_scaled_feps)$fstatistic[1],
+                 summary(raw_returns_1997_2018_quartile_three_scaled_feps)$fstatistic[2],
+                 summary(raw_returns_1997_2018_quartile_three_scaled_feps)$fstatistic[3]))
+raw_return_regression_p_stat_table_1997_2018[13,4]<-summary(raw_returns_1997_2018_quartile_three_scaled_feps)$fstatistic[1]
+raw_return_regression_p_stat_table_1997_2018[14,4]<-p_value
+raw_return_regression_p_stat_table_1997_2018[15,4]<-chi_squared_raw_returns_1997_2018_quartile_three_scaled_feps[1]
+raw_return_regression_p_stat_table_1997_2018[16,4]<-chi_squared_raw_returns_1997_2018_quartile_three_scaled_feps[3]
+# Quartile Four
+temp_coeff<-coef(raw_returns_1997_2018_quartile_four_scaled_feps)
+temp_t_stat<-summary(raw_returns_1997_2018_quartile_four_scaled_feps)[["coefficients"]][, "t value"]
+temp_p_stat<-summary(raw_returns_1997_2018_quartile_four_scaled_feps)[["coefficients"]][, 4]
+for(index in 1:length(temp_coeff)){
+  raw_return_regression_coeff_table_1997_2018[index,5]<-temp_coeff[index]
+  raw_return_regression_t_stat_table_1997_2018[index,5]<-temp_t_stat[index]
+  raw_return_regression_p_stat_table_1997_2018[index,5]<-temp_p_stat[index]
+}
+p_value <- (1-pf(summary(raw_returns_1997_2018_quartile_four_scaled_feps)$fstatistic[1],
+                 summary(raw_returns_1997_2018_quartile_four_scaled_feps)$fstatistic[2],
+                 summary(raw_returns_1997_2018_quartile_four_scaled_feps)$fstatistic[3]))
+raw_return_regression_p_stat_table_1997_2018[13,5]<-summary(raw_returns_1997_2018_quartile_four_scaled_feps)$fstatistic[1]
+raw_return_regression_p_stat_table_1997_2018[14,5]<-p_value
+raw_return_regression_p_stat_table_1997_2018[15,5]<-chi_squared_raw_returns_1997_2018_quartile_four_scaled_feps[1]
+raw_return_regression_p_stat_table_1997_2018[16,5]<-chi_squared_raw_returns_1997_2018_quartile_four_scaled_feps[3]
+
+write.csv(raw_return_regression_coeff_table_1997_2018,"raw_return_regression_coeff_table_1997_2018.csv")
+write.csv(raw_return_regression_t_stat_table_1997_2018,"raw_return_regression_t_stat_table_1997_2018.csv")
+write.csv(raw_return_regression_p_stat_table_1997_2018,"raw_return_regression_p_stat_table_1997_2018.csv")
+```
+Output excess return into excel
+```{r}
+x <- c("Overall","Q1(Low)","Q2","Q3","Q4(High)")
+y <- c('January','February','March','April','May','June','July','August','September','October','November','December')
+z <- c('January','February','March','April','May','June','July','August','September','October','November','December','F_Statistic','F_Statistic-P','Chi-Squared_Test','Chi-Square-P')
+# Creation of the coefficent table 
+excess_return_regression_coeff_table_1997_2018<- data.frame(matrix(ncol = 5, nrow = 12))
+colnames(excess_return_regression_coeff_table_1997_2018) <- x
+rownames(excess_return_regression_coeff_table_1997_2018)<-y
+# Creation of the t_stat_table 
+excess_return_regression_t_stat_table_1997_2018<- data.frame(matrix(ncol = 5, nrow = 12))
+colnames(excess_return_regression_t_stat_table_1997_2018) <- x
+rownames(excess_return_regression_t_stat_table_1997_2018)<-y
+# Creation of the p_stat_table 
+excess_return_regression_p_stat_table_1997_2018<- data.frame(matrix(ncol = 5, nrow = 16))
+colnames(excess_return_regression_p_stat_table_1997_2018) <- x
+rownames(excess_return_regression_p_stat_table_1997_2018)<-z
+# Overall
+temp_coeff<-coef(excess_returns_full_database_1997_2018_regression_model)
+temp_t_stat<-summary(excess_returns_full_database_1997_2018_regression_model)[["coefficients"]][, "t value"]
+temp_p_stat<-summary(excess_returns_full_database_1997_2018_regression_model)[["coefficients"]][, 4]
+for(index in 1:length(temp_coeff)){
+  excess_return_regression_coeff_table_1997_2018[index,1]<-temp_coeff[index]
+  excess_return_regression_t_stat_table_1997_2018[index,1]<-temp_t_stat[index]
+  excess_return_regression_p_stat_table_1997_2018[index,1]<-temp_p_stat[index]
+}
+p_value <- (1-pf(summary(excess_returns_full_database_1997_2018_regression_model)$fstatistic[1],
+                 summary(excess_returns_full_database_1997_2018_regression_model)$fstatistic[2],
+                 summary(excess_returns_full_database_1997_2018_regression_model)$fstatistic[3]))
+# Add the overall Stats
+excess_return_regression_p_stat_table_1997_2018[13,1]<-summary(excess_returns_full_database_1997_2018_regression_model)$fstatistic[1]
+excess_return_regression_p_stat_table_1997_2018[14,1]<-p_value
+excess_return_regression_p_stat_table_1997_2018[15,1]<-chi_squared_excess_returns_1997_2018[1]
+excess_return_regression_p_stat_table_1997_2018[16,1]<-chi_squared_excess_returns_1997_2018[3]
+# Quartile One
+temp_coeff<-coef(excess_returns_1997_2018_quartile_one_scaled_feps)
+temp_t_stat<-summary(excess_returns_1997_2018_quartile_one_scaled_feps)[["coefficients"]][, "t value"]
+temp_p_stat<-summary(excess_returns_1997_2018_quartile_one_scaled_feps)[["coefficients"]][, 4]
+for(index in 1:length(temp_coeff)){
+  excess_return_regression_coeff_table_1997_2018[index,2]<-temp_coeff[index]
+  excess_return_regression_t_stat_table_1997_2018[index,2]<-temp_t_stat[index]
+  excess_return_regression_p_stat_table_1997_2018[index,2]<-temp_p_stat[index]
+}
+p_value <- (1-pf(summary(excess_returns_1997_2018_quartile_one_scaled_feps)$fstatistic[1],
+                 summary(excess_returns_1997_2018_quartile_one_scaled_feps)$fstatistic[2],
+                 summary(excess_returns_1997_2018_quartile_one_scaled_feps)$fstatistic[3]))
+excess_return_regression_p_stat_table_1997_2018[13,2]<-summary(excess_returns_1997_2018_quartile_one_scaled_feps)$fstatistic[1]
+excess_return_regression_p_stat_table_1997_2018[14,2]<-p_value
+excess_return_regression_p_stat_table_1997_2018[15,2]<-chi_squared_excess_returns_1997_2018_quartile_one_scaled_feps[1]
+excess_return_regression_p_stat_table_1997_2018[16,2]<-chi_squared_excess_returns_1997_2018_quartile_one_scaled_feps[3]
+# Quartile two
+temp_coeff<-coef(excess_returns_1997_2018_quartile_two_scaled_feps)
+temp_t_stat<-summary(excess_returns_1997_2018_quartile_two_scaled_feps)[["coefficients"]][, "t value"]
+temp_p_stat<-summary(excess_returns_1997_2018_quartile_two_scaled_feps)[["coefficients"]][, 4]
+for(index in 1:length(temp_coeff)){
+  excess_return_regression_coeff_table_1997_2018[index,3]<-temp_coeff[index]
+  excess_return_regression_t_stat_table_1997_2018[index,3]<-temp_t_stat[index]
+  excess_return_regression_p_stat_table_1997_2018[index,3]<-temp_p_stat[index]
+}
+p_value <- (1-pf(summary(excess_returns_1997_2018_quartile_two_scaled_feps)$fstatistic[1],
+                 summary(excess_returns_1997_2018_quartile_two_scaled_feps)$fstatistic[2],
+                 summary(excess_returns_1997_2018_quartile_two_scaled_feps)$fstatistic[3]))
+excess_return_regression_p_stat_table_1997_2018[13,3]<-summary(excess_returns_1997_2018_quartile_two_scaled_feps)$fstatistic[1]
+excess_return_regression_p_stat_table_1997_2018[14,3]<-p_value
+excess_return_regression_p_stat_table_1997_2018[15,3]<-chi_squared_excess_returns_1997_2018_quartile_two_scaled_feps[1]
+excess_return_regression_p_stat_table_1997_2018[16,3]<-chi_squared_excess_returns_1997_2018_quartile_two_scaled_feps[3]
+# Quartile Three
+temp_coeff<-coef(excess_returns_1997_2018_quartile_three_scaled_feps)
+temp_t_stat<-summary(excess_returns_1997_2018_quartile_three_scaled_feps)[["coefficients"]][, "t value"]
+temp_p_stat<-summary(excess_returns_1997_2018_quartile_three_scaled_feps)[["coefficients"]][, 4]
+for(index in 1:length(temp_coeff)){
+  excess_return_regression_coeff_table_1997_2018[index,4]<-temp_coeff[index]
+  excess_return_regression_t_stat_table_1997_2018[index,4]<-temp_t_stat[index]
+  excess_return_regression_p_stat_table_1997_2018[index,4]<-temp_p_stat[index]
+}
+p_value <- (1-pf(summary(excess_returns_1997_2018_quartile_three_scaled_feps)$fstatistic[1],
+                 summary(excess_returns_1997_2018_quartile_three_scaled_feps)$fstatistic[2],
+                 summary(excess_returns_1997_2018_quartile_three_scaled_feps)$fstatistic[3]))
+excess_return_regression_p_stat_table_1997_2018[13,4]<-summary(excess_returns_1997_2018_quartile_three_scaled_feps)$fstatistic[1]
+excess_return_regression_p_stat_table_1997_2018[14,4]<-p_value
+excess_return_regression_p_stat_table_1997_2018[15,4]<-chi_squared_excess_returns_1997_2018_quartile_three_scaled_feps[1]
+excess_return_regression_p_stat_table_1997_2018[16,4]<-chi_squared_excess_returns_1997_2018_quartile_three_scaled_feps[3]
+# Quartile Four
+temp_coeff<-coef(excess_returns_1997_2018_quartile_four_scaled_feps)
+temp_t_stat<-summary(excess_returns_1997_2018_quartile_four_scaled_feps)[["coefficients"]][, "t value"]
+temp_p_stat<-summary(excess_returns_1997_2018_quartile_four_scaled_feps)[["coefficients"]][, 4]
+for(index in 1:length(temp_coeff)){
+  excess_return_regression_coeff_table_1997_2018[index,5]<-temp_coeff[index]
+  excess_return_regression_t_stat_table_1997_2018[index,5]<-temp_t_stat[index]
+  excess_return_regression_p_stat_table_1997_2018[index,5]<-temp_p_stat[index]
+}
+p_value <- (1-pf(summary(excess_returns_1997_2018_quartile_four_scaled_feps)$fstatistic[1],
+                 summary(excess_returns_1997_2018_quartile_four_scaled_feps)$fstatistic[2],
+                 summary(excess_returns_1997_2018_quartile_four_scaled_feps)$fstatistic[3]))
+excess_return_regression_p_stat_table_1997_2018[13,5]<-summary(excess_returns_1997_2018_quartile_four_scaled_feps)$fstatistic[1]
+excess_return_regression_p_stat_table_1997_2018[14,5]<-p_value
+excess_return_regression_p_stat_table_1997_2018[15,5]<-chi_squared_excess_returns_1997_2018_quartile_four_scaled_feps[1]
+excess_return_regression_p_stat_table_1997_2018[16,5]<-chi_squared_excess_returns_1997_2018_quartile_four_scaled_feps[3]
+
+write.csv(excess_return_regression_coeff_table_1997_2018,"excess_return_regression_coeff_table_1997_2018.csv")
+write.csv(excess_return_regression_t_stat_table_1997_2018,"excess_return_regression_t_stat_table_1997_2018.csv")
+write.csv(excess_return_regression_p_stat_table_1997_2018,"excess_return_regression_p_stat_table_1997_2018.csv")
+```
+
+
